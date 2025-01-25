@@ -8,6 +8,9 @@
 
 > 如果需要对域名进行到期监控和邮件提醒，必须设置发件邮件
 
+注意：
+1. 如果使用的是163邮箱，密码处填写的是`授权码` 
+
 ![](https://raw.githubusercontent.com/mouday/domain-admin/master/image/system-list.png)
 
 第二步：填写收件人列表
@@ -33,7 +36,9 @@
 
 ### 2.2、webhook发送钉钉消息
 
-获取请求地址
+文档：[https://open.dingtalk.com/document/orgapp/custom-bot-send-message-type](https://open.dingtalk.com/document/orgapp/custom-bot-send-message-type)
+
+webhook地址
 
 ```
 https://oapi.dingtalk.com/robot/send?access_token=<access_token>
@@ -47,31 +52,47 @@ https://oapi.dingtalk.com/robot/send?access_token=<access_token>
 }
 ```
 
-设置请求体
+示例：SSL证书到期（文本格式）
 
 ```json
 {
   "msgtype": "text",
   "text": {
-    "content":"监控报警: 我就是我, 是不一样的烟火"
+      "content": "以下证书临期，请检查：\n {% for row in list %}{{row.domain}} {{row.start_date or '-' }} ~ {{row.expire_date or '-' }} (剩余{{row.expire_days}}天)\n{% endfor %}"
   }
 }
 ```
 
-使用模板的请求体示例
+示例：SSL证书到期（markdown格式）
 
 ```json
 {
-  "msgtype": "text",
-  "text": {
-      "content": "{% for row in list %}{{row.domain}} {{row.start_date or '-' }} - {{row.expire_date or '-' }} ({{row.expire_days}}){% endfor %}"
+  "msgtype": "markdown",
+  "markdown": {
+    "title": "SSL证书到期提醒",
+    "text": "### SSL证书到期提醒 🔔\n\n| 域名 | 到期 |\n| ---- | ---- |\n{% for row in list %}| {{row.domain}} | {{row.expire_date or '未知'}}({{row.expire_days}}天) |\n{% endfor %}\n\n> 请及时更新即将到期的SSL证书。"
   }
+}
+```
+
+示例：网站监控异常（markdown格式）
+
+```json
+{
+    "msgtype": "markdown",
+    "markdown": {
+        "title": "网站监控异常提醒",
+        "text": "{{monitor_row.title}} 监测异常，请检查：\n
+         请求URL：<font color=\"red\">{{monitor_row.http_url}}</font>
+         重试次数：<font color=\"red\">{{monitor_row.allow_error_count}}</font>
+         状态：{% if monitor_row.status==2 %}<font color=\"red\">失败</font>{% elif monitor_row.status==1 %}<font color=\"green\">成功</font>{% else %}<font color=\"comment\">未知</font>{% endif %}"
+    }
 }
 ```
 
 可以参考 [@PanZongQing](https://github.com/PanZongQing) 分享的钉钉webhook配置：
 
-[对接钉钉群内自定义webhook机器人发送告警注意事项](https://github.com/mouday/domain-admin/issues/47)
+[对接钉钉群内自定义webhook机器人发送告警注意事项](https://github.com/dromara/domain-admin/issues/47)
 
 
 ### 2.3、webhook发送Resend邮件
@@ -141,6 +162,129 @@ https://push.showdoc.com.cn/server/api/push/<API Key>
   "content": "{% for row in list %}{{row.domain}} {{row.start_date or '-' }} - {{row.expire_date or '-' }} ({{row.expire_days}}){% endfor %}"
 }
 ```
+
+### 2.5、webhook发送飞书消息
+
+模板示例由微信群友@kaka 提供
+
+```json
+{
+    "msg_type": "interactive",
+    "card": {
+        "config": {
+                "wide_screen_mode": true,
+                "enable_forward": true
+        },
+        "elements": [{
+                "tag": "div",
+                "text": {
+                        "tag": "plain_text",
+                        "content": "",
+                        "lines": 1
+                        }
+                        ,
+                "fields": [
+
+                        {
+
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**域名证书 **:  <ul> {%- for row in list %} {%- if row.expire_days > 0 %} <li> {{row.domain}} {{"当前域名或证书  申请时间: "}} {{row.start_date or '-' }} - {{"到期时间: "}} {{row.expire_date or '-' }} {{"剩余: "}}( {% if row.expire_days > 0 %} {{row.expire_days}} {% endif %}  ) {{"天; "}} {% endif %} {% endfor %} </li> </ul> "
+                        }
+                    }
+
+                ]
+
+                },
+
+
+         {
+                "actions": [{
+                        "tag": "button",
+
+                        "text": {
+                                "content": "域名或证书过期提醒 :玫瑰:",
+                                "tag": "lark_md"
+                        },
+                        "url": "https://dc.console.aliyun.com/",
+                        "type": "primary",
+                        "value": {
+                                         "chosen": "approve"
+                        }
+                }],
+                "tag": "action"
+        }],
+        "header": {
+                "title": {
+                        "content": "域名或证书过期  告警",
+                        "tag": "plain_text"
+                },
+                "template": "red"
+        }
+    }
+}
+```
+
+### 2.6、webhook发送企业微信消息
+
+文档：[https://developer.work.weixin.qq.com/document/path/99110](https://developer.work.weixin.qq.com/document/path/99110)
+
+webhook地址
+
+```
+https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=693a91f6-7xxx-4bc4-97a0-0ec2sifa5aaa
+```
+
+消息体
+```json
+{
+    "msgtype": "text",
+    "text": {
+        "content": "广州今日天气：29度，大部分多云，降雨概率：60%",
+		"mentioned_list":["wangqing","@all"],
+		"mentioned_mobile_list":["13800001111","@all"]
+    }
+}
+```
+
+示例：监控证书到期（文本格式）
+
+```json
+{
+    "msgtype": "text",
+    "text": {
+        "content": "SSL证书到期提醒：{% for row in list %}{{row.domain}} {{row.start_date or '-' }} - {{row.expire_date or '-' }} ({{row.expire_days}}){% endfor %}"
+    }
+}
+```
+
+示例：监控证书到期（markdown格式）
+
+```json
+{
+  "msgtype": "markdown",
+  "markdown": {
+    "title": "SSL证书到期提醒",
+    "content": "### SSL证书到期提醒 🔔\n\n| 域名 | 生效日期 | 到期日期 | 剩余天数 |\n| ---- | -------- | -------- | :--------: |\n{% for row in list %}| {{row.domain}} | {{row.start_date or '未知'}} | {{row.expire_date or '未知'}} | {{row.expire_days}}天 |\n{% endfor %}\n\n> 请及时更新即将到期的SSL证书，以确保网站安全性。"
+  }
+}
+```
+
+示例：网站监控异常
+
+```json
+{
+    "msgtype": "markdown",
+    "markdown": {
+        "content": "{{monitor_row.title}}监测提醒，请相关同事注意。\n
+         >请求URL:<font color=\"red\">{{monitor_row.http_url}}</font>
+         >重试次数:<font color=\"red\">{{monitor_row.allow_error_count}}</font>
+         >状态:{% if monitor_row.status==2 %}<font color=\"red\">失败</font>{% elif monitor_row.status==1 %}<font color=\"green\">成功</font>{% else %}<font color=\"comment\">未知</font>{% endif %}"
+    }
+}
+```
+
+
 
 ## 3、企业微信
 
@@ -333,3 +477,31 @@ WebHook、企业微信、飞书、钉钉均支持自定义通知模板
     ]
 }
 ```
+
+
+### 6.4、监控异常
+      
+异常通知和异常恢复通知的字段一致
+                   
+```json
+{
+    "monitor_row": {
+        "title": "名称",
+        "http_url": "请求URL",
+        "allow_error_count": 3,
+        "status": 2
+    },
+    "error": "报错信息"
+}
+```
+
+参数说明
+
+| 参数  | 类型  | 说明 |
+| -| - | - |
+| error | string | 报错信息
+| monitor_row.title | string | 名称
+| monitor_row.http_url | string | 请求URL
+| monitor_row.allow_error_count | int | 重试次数
+| monitor_row.status | int | 状态：0未知，1成功，2失败
+
